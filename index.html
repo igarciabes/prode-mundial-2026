@@ -415,9 +415,28 @@ function calcPoints(pred, result) {
   return { pts: 0, type: "wrong" };
 }
 
+// ========== TIME-BASED LOCK ==========
+function getKickoffTime(match) {
+  const [day, month] = match.date.split("/").map(Number);
+  const [hour, min] = match.time.split(":").map(Number);
+  // Argentina is UTC-3; store as UTC
+  const utc = new Date(Date.UTC(2026, month - 1, day, hour + 3, min));
+  return utc.getTime();
+}
+
+function isMatchLocked(match) {
+  return Date.now() >= getKickoffTime(match);
+}
+
 // ========== SAVE PREDICTIONS ==========
 function savePrediction(matchId, side, value) {
   if (!currentUser) return;
+  const match = MATCHES.find(m => m.id === matchId);
+  if (match && isMatchLocked(match)) {
+    showToast("Partido cerrado — no se pueden cambiar pronósticos");
+    render();
+    return;
+  }
   const path = `prode2026/predictions/${currentUser}/m${matchId}/${side}`;
   db.ref(path).set(value === "" ? null : parseInt(value));
 }
@@ -496,12 +515,14 @@ function renderPredictions() {
         }
       }
       const hasResult = result && !isNaN(parseInt(result.h)) && !isNaN(parseInt(result.a));
-      const locked = hasResult ? "locked" : "";
-      const ro = hasResult ? "readonly" : "";
+      const timeLocked = isMatchLocked(m);
+      const locked = (hasResult || timeLocked) ? "locked" : "";
+      const ro = (hasResult || timeLocked) ? "readonly" : "";
       const hVal = pred && pred.h !== undefined && pred.h !== null ? pred.h : "";
       const aVal = pred && pred.a !== undefined && pred.a !== null ? pred.a : "";
+      const lockLabel = timeLocked && !hasResult ? ' <span style="color:#e74c3c;font-size:.65rem">🔒 Cerrado</span>' : "";
       html += `<div class="match-row">
-        <div class="match-date">${m.date}<span>${m.time} AR</span></div>
+        <div class="match-date">${m.date}<span>${m.time} AR${lockLabel}</span></div>
         <div class="match-teams">
           <span class="flag">${flag(m.home)}</span>
           <span class="team-name" title="${m.home}">${shortName(m.home)}</span>
