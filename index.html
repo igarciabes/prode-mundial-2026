@@ -110,10 +110,20 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 <div id="setupScreen" class="loading-overlay" style="display:none">
   <div class="setup-box">
     <h2>&#9917; Prode Mundial 2026</h2>
-    <p>Ingresa tu nombre para unirte al prode con tus amigos</p>
-    <input type="text" id="setupName" placeholder="Tu nombre" autofocus onkeydown="if(event.key==='Enter')joinProde()">
-    <br>
-    <button class="btn" onclick="joinProde()" style="width:100%;padding:14px;font-size:1.1rem">Entrar al Prode</button>
+    <p id="setupMsg">Ingresa tu nombre para unirte al prode con tus amigos</p>
+    <div id="setupNewUser">
+      <input type="text" id="setupName" placeholder="Tu nombre" autofocus onkeydown="if(event.key==='Enter')document.getElementById('setupPin').focus()">
+      <input type="password" id="setupPin" placeholder="PIN de 4 digitos" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="margin-top:8px;text-align:center;letter-spacing:8px;font-size:1.2rem" onkeydown="if(event.key==='Enter')joinProde()">
+      <br>
+      <button class="btn" onclick="joinProde()" style="width:100%;padding:14px;font-size:1.1rem">Crear cuenta y entrar</button>
+    </div>
+    <div id="setupLogin" style="display:none">
+      <p id="loginUserLabel" style="font-size:1.1rem;font-weight:600;color:var(--accent)"></p>
+      <input type="password" id="loginPin" placeholder="Tu PIN de 4 digitos" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="text-align:center;letter-spacing:8px;font-size:1.2rem" onkeydown="if(event.key==='Enter')confirmLogin()">
+      <br>
+      <button class="btn" onclick="confirmLogin()" style="width:100%;padding:14px;font-size:1.1rem">Entrar</button>
+      <button class="btn btn-secondary" onclick="backToSetup()" style="width:100%;padding:10px;margin-top:8px;font-size:.9rem">Volver</button>
+    </div>
     <div id="existingUsers" style="margin-top:20px"></div>
   </div>
 </div>
@@ -331,11 +341,30 @@ function initListeners() {
 }
 
 // ========== USER MANAGEMENT ==========
+function simpleHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return "h" + Math.abs(h).toString(36);
+}
+
+let pendingLoginKey = "";
+
 function showSetupScreen() {
   document.getElementById("loadingScreen").style.display = "none";
   document.getElementById("setupScreen").style.display = "flex";
   document.getElementById("mainApp").style.display = "none";
+  backToSetup();
   renderExistingUsers();
+}
+
+function backToSetup() {
+  document.getElementById("setupNewUser").style.display = "block";
+  document.getElementById("setupLogin").style.display = "none";
+  document.getElementById("setupMsg").textContent = "Ingresa tu nombre para unirte al prode con tus amigos";
+  document.getElementById("existingUsers").style.display = "block";
+  pendingLoginKey = "";
   setTimeout(() => document.getElementById("setupName").focus(), 100);
 }
 
@@ -343,23 +372,67 @@ function renderExistingUsers() {
   const container = document.getElementById("existingUsers");
   if (allUsers.length > 0) {
     container.innerHTML = `<p style="color:var(--dim);font-size:.85rem;margin-bottom:10px">O entra como jugador existente:</p>
-      ${allUsers.map(u => `<button class="btn btn-secondary btn-small" style="margin:4px" onclick="loginAs('${u}')">${u}</button>`).join("")}`;
+      ${allUsers.map(u => `<button class="btn btn-secondary btn-small" style="margin:4px" onclick="promptLogin('${u}')">${u}</button>`).join("")}`;
   } else {
     container.innerHTML = `<p style="color:var(--dim);font-size:.8rem">Se el primero en unirte!</p>`;
   }
 }
 
+function promptLogin(key) {
+  pendingLoginKey = key;
+  document.getElementById("setupNewUser").style.display = "none";
+  document.getElementById("setupLogin").style.display = "block";
+  document.getElementById("existingUsers").style.display = "none";
+  document.getElementById("setupMsg").textContent = "Ingresa tu PIN para entrar";
+  document.getElementById("loginUserLabel").textContent = key;
+  document.getElementById("loginPin").value = "";
+  setTimeout(() => document.getElementById("loginPin").focus(), 100);
+}
+
+function confirmLogin() {
+  const pin = document.getElementById("loginPin").value.trim();
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    showToast("El PIN debe ser de 4 digitos");
+    return;
+  }
+  db.ref("prode2026/users/" + pendingLoginKey).once("value", snap => {
+    const data = snap.val();
+    if (!data) { showToast("Usuario no encontrado"); return; }
+    if (data.pin && data.pin !== simpleHash(pin)) {
+      showToast("PIN incorrecto");
+      document.getElementById("loginPin").value = "";
+      document.getElementById("loginPin").focus();
+      return;
+    }
+    if (!data.pin) {
+      db.ref("prode2026/users/" + pendingLoginKey + "/pin").set(simpleHash(pin));
+    }
+    currentUser = pendingLoginKey;
+    localStorage.setItem("prode2026_user", pendingLoginKey);
+    localStorage.setItem("prode2026_pin", pin);
+    showMainApp();
+    showToast("Hola " + pendingLoginKey + "!");
+  });
+}
+
 function joinProde() {
   const name = document.getElementById("setupName").value.trim();
   if (!name) return;
-  const key = sanitizeKey(name);
-  if (allUsers.includes(key)) {
-    loginAs(key);
+  const pin = document.getElementById("setupPin").value.trim();
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    showToast("Elige un PIN de 4 digitos");
+    document.getElementById("setupPin").focus();
     return;
   }
-  db.ref("prode2026/users/" + key).set({ name: name, joined: Date.now() });
+  const key = sanitizeKey(name);
+  if (allUsers.includes(key)) {
+    promptLogin(key);
+    return;
+  }
+  db.ref("prode2026/users/" + key).set({ name: name, joined: Date.now(), pin: simpleHash(pin) });
   currentUser = key;
   localStorage.setItem("prode2026_user", key);
+  localStorage.setItem("prode2026_pin", pin);
   showMainApp();
   showToast("Bienvenido " + name + "!");
 }
@@ -382,6 +455,7 @@ function showMainApp() {
 function changeUser() {
   currentUser = "";
   localStorage.removeItem("prode2026_user");
+  localStorage.removeItem("prode2026_pin");
   showSetupScreen();
 }
 
@@ -691,7 +765,19 @@ function init() {
     initListeners();
     setTimeout(() => {
       if (currentUser && allUsers.includes(currentUser)) {
-        showMainApp();
+        const savedPin = localStorage.getItem("prode2026_pin");
+        if (savedPin) {
+          db.ref("prode2026/users/" + currentUser).once("value", snap => {
+            const data = snap.val();
+            if (data && (!data.pin || data.pin === simpleHash(savedPin))) {
+              showMainApp();
+            } else {
+              showSetupScreen();
+            }
+          });
+        } else {
+          showSetupScreen();
+        }
       } else {
         showSetupScreen();
       }
