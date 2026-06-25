@@ -599,6 +599,7 @@ function renderPredictions() {
       const timeLocked = isMatchLocked(m);
       const locked = (hasResult || timeLocked) ? "locked" : "";
       const ro = (hasResult || timeLocked) ? "readonly" : "";
+      const _dbg = m.group === "D" ? `<div style="font-size:.55rem;color:#f39c12">id:${m.id} hasResult:${hasResult} timeLocked:${timeLocked} kickoff:${new Date(getKickoffTime(m)).toISOString()} now:${new Date().toISOString()} result:${JSON.stringify(result)}</div>` : "";
       const hVal = pred && pred.h !== undefined && pred.h !== null ? pred.h : "";
       const aVal = pred && pred.a !== undefined && pred.a !== null ? pred.a : "";
       const msLeft = getKickoffTime(m) - Date.now();
@@ -610,6 +611,7 @@ function renderPredictions() {
         lockLabel = ` <span style="color:#f39c12;font-size:.65rem">${daysLeft}d</span>`;
       }
       html += `<div class="match-row">
+        ${_dbg}
         <div class="match-date">${m.date}<span>${m.time} AR${lockLabel}</span></div>
         <div class="match-teams">
           <span class="flag">${flag(m.home)}</span>
