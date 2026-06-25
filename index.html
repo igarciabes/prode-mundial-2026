@@ -499,11 +499,6 @@ function getKickoffTime(match) {
 }
 
 function isMatchLocked(match) {
-  // Excepción temporal: partidos del 25/06 abiertos hasta las 17:15 AR
-  if (match.date === "25/06") {
-    const deadline = new Date(Date.UTC(2026, 5, 25, 20, 15)).getTime();
-    return Date.now() >= deadline;
-  }
   return Date.now() >= getKickoffTime(match);
 }
 
