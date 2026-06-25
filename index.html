@@ -137,7 +137,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
       <span class="trophy">&#9917;</span>
       <div>
         <h1>PRODE MUNDIAL 2026</h1>
-        <div style="font-size:.7rem;color:var(--dim)">Fase de Grupos
+        <div style="font-size:.7rem;color:var(--dim)">Fase de Grupos v7
           <span class="sync-badge online" id="syncBadge">&#9679; Sincronizado</span>
         </div>
       </div>
@@ -496,9 +496,13 @@ function calcPoints(pred, result) {
 function getKickoffTime(match) {
   const [day, month] = match.date.split("/").map(Number);
   const [hour, min] = match.time.split(":").map(Number);
-  // Argentina is UTC-3; store as UTC
-  const utc = new Date(Date.UTC(2026, month - 1, day, hour + 3, min));
-  return utc.getTime();
+  // Argentina is UTC-3 → convert to UTC
+  let utcH = hour + 3, utcD = day, utcM = month;
+  if (utcH >= 24) {
+    utcH -= 24;
+    utcD += 1;
+  }
+  return Date.UTC(2026, utcM - 1, utcD, utcH, min);
 }
 
 function isMatchLocked(match) {
