@@ -594,7 +594,14 @@ function renderPredictions() {
       const ro = (hasResult || timeLocked) ? "readonly" : "";
       const hVal = pred && pred.h !== undefined && pred.h !== null ? pred.h : "";
       const aVal = pred && pred.a !== undefined && pred.a !== null ? pred.a : "";
-      const lockLabel = timeLocked && !hasResult ? ' <span style="color:#e74c3c;font-size:.65rem">🔒 Cerrado</span>' : "";
+      const msLeft = getKickoffTime(m) - Date.now();
+      const daysLeft = Math.ceil(msLeft / 86400000);
+      let lockLabel = "";
+      if (timeLocked && !hasResult) {
+        lockLabel = ' <span style="color:#e74c3c;font-size:.65rem">\u{1F512} Cerrado</span>';
+      } else if (!hasResult && daysLeft <= 3 && daysLeft > 0) {
+        lockLabel = ` <span style="color:#f39c12;font-size:.65rem">${daysLeft}d</span>`;
+      }
       html += `<div class="match-row">
         <div class="match-date">${m.date}<span>${m.time} AR${lockLabel}</span></div>
         <div class="match-teams">
